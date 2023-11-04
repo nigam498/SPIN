@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+    #container {
+      text-align: center;
+    }
+    canvas {
+      background-color: #333;
+      cursor: pointer;
+      margin: 0 auto;
+      display: block;
+    }
+    button {
+      margin: 10px;
+      padding: 10px;
+      background-color: #3498db;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+    }
+    h1 {
+      font-size: 36px;
+      font-weight: bold;
+    }
+    p {
+      font-size: 18px;
+    }
+    a {
+      font-size: 24px;
+      font-weight: bold;
+      color: #3498db;
+      text-decoration: none;
+    }
+    #winSpinIndicator {
+      font-size: 20px;
+      color: #f39c12;
+    }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <h1>Spin and Win like a Casino</h1>
+    <canvas id="canvas" width="600" height="600"></canvas>
+    <button id="startBtn">Start</button>
+    <button id="stopBtn">Stop</button>
+    <label for="manualSpeedInput">Manual Speed (0.01 - 10.0):</label>
+    <input type="number" id="manualSpeedInput" step="0.01" min="0.01" max="10.0" value="0.01">
+    <button id="clockwiseBtn">Clockwise</button>
+    <button id="counterclockwiseBtn">Counterclockwise</button>
+    <div id="winMessage" style="display: none;">
+      <span id="winSpinIndicator">WinSpin:</span>
+      You won: <span id="prizeAmount"></span>
+    </div>
+    <p>Created by <a href="https://nigam498.github.io/secretmessageservice/">Nigam Patel</a></p>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    const width = canvas.width;
+    const height = canvas.height;
+    const radius = Math.min(width, height) * 0.4;
+    ctx.translate(width / 2, height / 2);
+
+    const numbers = [40, 1, 2, 1, 2, 5, 1, 2, 10, 1, 100, 1, 5, 2, 1, 20, 1, 2, 1, 5, 1, 10, 1, 2, 5, 1, 2, 1, 2, 5, 1, 2, 1, 2, 10, 1, 700, 1, 2, 1, 20, 1, 2, 5, 1, 2, 1, 10, 1, 5, 1, 2];
+
+    let spinSpeed = 0.01; // Initial spin speed (can be adjusted by the user)
+    const pinWidth = 10;
+    let spinning = false;
+    let angle = 0;
+    let isDragging = false;
+    let startAngle = 0;
+    let decreaseRate = 0.0001; // Adjust the decrease rate (speed reduction per millisecond)
+    let clockwise = true; // Initial rotation direction
+
+    document.getElementById("startBtn").addEventListener("click", () => {
+      if (!spinning) {
+        const manualSpeed = parseFloat(document.getElementById("manualSpeedInput").value);
+        if (!isNaN(manualSpeed)) {
+          spinSpeed = manualSpeed;
+          spinning = true;
+          spinWheel();
+        }
+      }
+    });
+
+    document.getElementById("stopBtn").addEventListener("click", () => {
+      if (spinning) {
+        stopSpin();
+      }
+    });
+
+    document.getElementById("clockwiseBtn").addEventListener("click", () => {
+      clockwise = true;
+    });
+
+    document.getElementById("counterclockwiseBtn").addEventListener("click", () => {
+      clockwise = false;
+    });
+
+    canvas.addEventListener("mousedown", (e) => {
+      if (!spinning) {
+        isDragging = true;
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left - width / 2;
+        const y = e.clientY - rect.top - height / 2;
+        startAngle = Math.atan2(y, x) - angle;
+      }
+    });
+
+    canvas.addEventListener("mousemove", (e) => {
+      if (isDragging && !spinning) {
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left - width / 2;
+        const y = e.clientY - rect.top - height / 2;
+        angle = Math.atan2(y, x) - startAngle;
+        drawWheel(angle);
+      }
+    });
+
+    canvas.addEventListener("mouseup", () => {
+      isDragging = false;
+    });
+
+    function spinWheel() {
+      if (!spinning) return;
+
+      angle += clockwise ? spinSpeed : -spinSpeed; // Adjust for clockwise or counterclockwise
+      drawWheel(angle);
+
+      // Check if the wheel stopped
+      if (spinSpeed <= 0.0001) {
+        spinning = false;
+        showWinMessage(getWinningNumber(angle));
+      } else {
+        requestAnimationFrame(spinWheel);
+        spinSpeed -= decreaseRate;
+      }
+    }
+
+    function drawWheel(rotation) {
+      ctx.clearRect(-width / 2, -height / 2, width, height);
+
+      const step = (2 * Math.PI) / numbers.length;
+      for (let i = 0; i < numbers.length; i++) {
+        let ang = i * step - Math.PI / 2 + rotation;
+        let num = numbers[i];
+
+        const x = radius * Math.cos(ang);
+        const y = radius * Math.sin(ang);
+
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(x, y);
+        ctx.lineTo(x - pinWidth / 2, y);
+        ctx.lineTo(x, y - pinWidth);
+        ctx.closePath();
+
+        let fillColor = "#3498db"; // Default color
+
+        if (num === 40 || num === 100) {
+          fillColor = "blue";
+          num += "x";
+        } else if (num === 2 || num === 20 || num === 40) {
+          fillColor = "red";
+        } else if (num === 1) {
+          fillColor = "yellow";
+        } else if (num === 5) {
+          fillColor = "green";
+        } else if (num === 10) {
+          fillColor = "pink";
+        } else if (num === 700) {
+          fillColor = "golden";
+          num = "7x";
+        } else if (num === 2) {
+          fillColor = "silver";
+        }
+
+        ctx.fillStyle = fillColor;
+        ctx.fill();
+
+        ctx.fillStyle = "#fff";
+        ctx.font = "24px Arial";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(num.toString(), x - pinWidth / 2, y - pinWidth / 2);
+      }
+    }
+
+    function getWinningNumber(rotation) {
+      // Calculate the winning sector based on the current rotation
+      const step = (2 * Math.PI) / numbers.length;
+      const adjustedRotation = (rotation % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+      const sector = Math.floor((adjustedRotation + step / 2) / step) % numbers.length;
+
+      return sector;
+    }
+
+    function showWinMessage(sector) {
+      const winMessage = document.getElementById("winMessage");
+      const prizeAmount = document.getElementById("prizeAmount");
+      prizeAmount.textContent = numbers[sector];
+      winMessage.style.display = "block";
+    }
+
+    function stopSpin() {
+      // Gradually slow down the wheel
+      decreaseRate = 0.005;
+    }
+  </script>
+</body>
+</html>
