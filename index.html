@@ -20,7 +20,6 @@
 
 <canvas id="canvas" width="600" height="600"></canvas>
 <button id="startBtn">Start</button>
-
 <button id="resetBtn">Reset</button>
 <div id="instructions">Drag the wheel to set the start number.</div>
 <label for="manualSpeedInput">Manual Speed (0.01 - 10.0):</label>
@@ -60,8 +59,6 @@ document.getElementById("startBtn").addEventListener("click", () => {
   }
 });
 
-
-
 document.getElementById("resetBtn").addEventListener("click", () => {
   angle = 0;
   drawWheel(angle);
@@ -98,6 +95,35 @@ canvas.addEventListener("mousemove", (e) => {
 });
 
 canvas.addEventListener("mouseup", () => {
+  isDragging = false;
+});
+
+// Add touch event listeners for mobile devices
+canvas.addEventListener("touchstart", (e) => {
+  e.preventDefault(); // Prevent default touch behavior
+  if (!spinning) {
+    isDragging = true;
+    const rect = canvas.getBoundingClientRect();
+    const touch = e.touches[0];
+    const x = touch.clientX - rect.left - width / 2;
+    const y = touch.clientY - rect.top - height / 2;
+    startAngle = Math.atan2(y, x) - angle;
+  }
+});
+
+canvas.addEventListener("touchmove", (e) => {
+  e.preventDefault(); // Prevent default touch behavior
+  if (isDragging && !spinning) {
+    const rect = canvas.getBoundingClientRect();
+    const touch = e.touches[0];
+    const x = touch.clientX - rect.left - width / 2;
+    const y = touch.clientY - rect.top - height / 2;
+    angle = Math.atan2(y, x) - startAngle;
+    drawWheel(angle);
+  }
+});
+
+canvas.addEventListener("touchend", () => {
   isDragging = false;
 });
 
