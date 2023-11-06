@@ -2,9 +2,14 @@
 <html>
 <head>
   <style>
-    canvas {
-      background-color: #333;
-      cursor: pointer;
+    body {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      background-color: #f5f5f5;
+      overflow: hidden;
     }
     button {
       margin: 10px;
@@ -14,45 +19,94 @@
       border: none;
       cursor: pointer;
     }
+    .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background-color: #fff;
+      padding: 20px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+    #canvas {
+      margin-right: 20px; /* Add some margin to separate the wheel from the buttons */
+    }
+    #winPrice {
+      font-size: 20px;
+      color: #f00;
+    }
   </style>
 </head>
 <body>
-
-<canvas id="canvas" width="600" height="600"></canvas>
-<button id="startBtn">Start</button>
-<button id="resetBtn">Reset</button>
-<div id="instructions">Drag the wheel to set the start number.</div>
-<label for="manualSpeedInput">Manual Speed (0.01 - 10.0):</label>
-<input type="number" id="manualSpeedInput" step="0.01" min="0.01" max="10.0" value="0.01">
-<button id="clockwiseBtn">Clockwise</button>
-<button id="counterclockwiseBtn">Counterclockwise</button>
-<div id="winMessage" style="display: none;">You won: <span id="prizeAmount"></span></div>
+<svg id="canvas" width="600" height="600">
+  <g transform="translate(300, 300)">
+    <circle r="240" fill="#333" />
+    <g id="wheel">
+      <!-- Add SVG slices with custom colors -->
+    </g>
+    <polygon id="indicator" points="0,-240 -10,-250 10,-250" fill="#f00" /> <!-- Indicator -->
+  </g>
+</svg>
+<div class="container">
+  <button id="startBtn">Start</button>
+  <button id="resetBtn">Reset</button>
+  <div id="instructions">Drag the wheel to set the start number.</div>
+  <label for="manualSpeedInput">Manual Speed (0.01 - 10.0):</label>
+  <input type="number" id="manualSpeedInput" step="0.01" min="0.01" max="10.0" value="0.01">
+  <label for="sliceColorInput">Custom Slice Color:</label>
+  <input type="color" id="sliceColorInput" value="#3498db">
+  <label for "wheelIndicatorColorInput">Indicator Color:</label>
+  <input type="color" id="wheelIndicatorColorInput" value="#f00">
+  <label for="stripeColorInput">Custom Stripe Color:</label>
+  <input type="color" id="stripeColorInput" value="#f39c12">
+  <button id="clockwiseBtn">Clockwise</button>
+  <button id="counterclockwiseBtn">Counterclockwise</button>
+  <div id="winMessage" style="display: none;">You won: <span id="prizeAmount"></span></div>
+</div>
+<div id="winPrice" style="display: none;">Winning Prize: <span id="winningPrizeAmount"></span></div>
 
 <script>
-const canvas = document.getElementById("canvas");
-const ctx = canvas.getContext("2d");
-const width = canvas.width;
-const height = canvas.height;
-const radius = Math.min(width, height) * 0.4;
-ctx.translate(width / 2, height / 2);
+const svg = document.getElementById("canvas");
+const wheel = document.getElementById("wheel");
+const indicator = document.getElementById("indicator");
+const sliceColorInput = document.getElementById("sliceColorInput");
+const stripeColorInput = document.getElementById("stripeColorInput");
+const wheelIndicatorColorInput = document.getElementById("wheelIndicatorColorInput");
+const winningPrizeAmount = document.getElementById("winningPrizeAmount");
+
+let sliceColor = sliceColorInput.value;
+let stripeColor = stripeColorInput.value;
 
 const numbers = [40, 1, 2, 1, 2, 5, 1, 2, 10, 1, 100, 1, 5, 2, 1, 20, 1, 2, 1, 5, 1, 10, 1, 2, 5, 1, 2, 1, 2, 5, 1, 2, 1, 2, 10, 1, 700, 1, 2, 1, 20, 1, 2, 5, 1, 2, 1, 10, 1, 5, 1, 2];
 
-let spinSpeed = 0.01; // Initial spin speed (can be adjusted by the user)
-const pinWidth = 10;
+let spinSpeed = 0.01;
 let spinning = false;
 let angle = 0;
 let isDragging = false;
 let startAngle = 0;
-let decreaseRate = 0.0001; // Adjust the decrease rate (speed reduction per millisecond)
-let clockwise = true; // Initial rotation direction
+let decreaseRate = 0.0001;
+let clockwise = true;
+
+sliceColorInput.addEventListener("input", () => {
+  sliceColor = sliceColorInput.value;
+  drawWheel(angle);
+});
+
+wheelIndicatorColorInput.addEventListener("input", () => {
+  indicator.setAttribute("fill", wheelIndicatorColorInput.value);
+});
+
+stripeColorInput.addEventListener("input", () => {
+  stripeColor = stripeColorInput.value;
+  drawWheel(angle);
+});
 
 document.getElementById("startBtn").addEventListener("click", () => {
   if (!spinning) {
     const manualSpeed = parseFloat(document.getElementById("manualSpeedInput").value);
     if (!isNaN(manualSpeed)) {
       spinSpeed = manualSpeed;
-      showWinMessage(numbers[getWinningNumber()]); // Show the prize immediately
       spinning = true;
       spinWheel();
     }
@@ -61,7 +115,6 @@ document.getElementById("startBtn").addEventListener("click", () => {
 
 document.getElementById("resetBtn").addEventListener("click", () => {
   angle = 0;
-  drawWheel(angle);
   spinning = false;
   hideWinMessage();
 });
@@ -74,108 +127,83 @@ document.getElementById("counterclockwiseBtn").addEventListener("click", () => {
   clockwise = false;
 });
 
-canvas.addEventListener("mousedown", (e) => {
+svg.addEventListener("mousedown", (e) => {
   if (!spinning) {
     isDragging = true;
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left - width / 2;
-    const y = e.clientY - rect.top - height / 2;
+    const rect = svg.getBoundingClientRect();
+    const x = e.clientX - rect.left - 300;
+    const y = e.clientY - rect.top - 300;
     startAngle = Math.atan2(y, x) - angle;
   }
 });
 
-canvas.addEventListener("mousemove", (e) => {
+svg.addEventListener("mousemove", (e) => {
   if (isDragging && !spinning) {
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left - width / 2;
-    const y = e.clientY - rect.top - height / 2;
+    const rect = svg.getBoundingClientRect();
+    const x = e.clientX - rect.left - 300;
+    const y = e.clientY - rect.top - 300;
     angle = Math.atan2(y, x) - startAngle;
     drawWheel(angle);
   }
 });
 
-canvas.addEventListener("mouseup", () => {
-  isDragging = false;
-});
-
-// Add touch event listeners for mobile devices
-canvas.addEventListener("touchstart", (e) => {
-  e.preventDefault(); // Prevent default touch behavior
-  if (!spinning) {
-    isDragging = true;
-    const rect = canvas.getBoundingClientRect();
-    const touch = e.touches[0];
-    const x = touch.clientX - rect.left - width / 2;
-    const y = touch.clientY - rect.top - height / 2;
-    startAngle = Math.atan2(y, x) - angle;
-  }
-});
-
-canvas.addEventListener("touchmove", (e) => {
-  e.preventDefault(); // Prevent default touch behavior
-  if (isDragging && !spinning) {
-    const rect = canvas.getBoundingClientRect();
-    const touch = e.touches[0];
-    const x = touch.clientX - rect.left - width / 2;
-    const y = touch.clientY - rect.top - height / 2;
-    angle = Math.atan2(y, x) - startAngle;
-    drawWheel(angle);
-  }
-});
-
-canvas.addEventListener("touchend", () => {
+svg.addEventListener("mouseup", () => {
   isDragging = false;
 });
 
 function spinWheel() {
   if (!spinning) return;
 
-  angle += clockwise ? spinSpeed : -spinSpeed; // Adjust for clockwise or counterclockwise
+  angle += clockwise ? spinSpeed : -spinSpeed;
   drawWheel(angle);
 
-  // Decrease the spin speed gradually
   spinSpeed -= decreaseRate;
 
   if (spinSpeed <= 0) {
     spinSpeed = 0;
     spinning = false;
-    showWinMessage(numbers[getWinningNumber()]);
+    const winningNumber = getWinningNumber();
+    showWinMessage(numbers[winningNumber]);
+    winningPrizeAmount.textContent = numbers[winningNumber];
+    winningPrizeAmount.style.display = "block";
   } else {
     requestAnimationFrame(spinWheel);
   }
 }
 
 function drawWheel(rotation) {
-  ctx.clearRect(-width / 2, -height / 2, width, height);
+  wheel.innerHTML = "";
 
   const step = (2 * Math.PI) / numbers.length;
   for (let i = 0; i < numbers.length; i++) {
-    let ang = i * step - Math.PI / 2 + rotation;
-    let num = numbers[i];
+    const ang1 = i * step + rotation;
+    const ang2 = (i + 1) * step + rotation;
+    const num = numbers[i];
 
-    const x = radius * Math.cos(ang);
-    const y = radius * Math.sin(ang);
+    const x1 = 220 * Math.cos(ang1);
+    const y1 = 220 * Math.sin(ang1);
+    const x2 = 220 * Math.cos(ang2);
+    const y2 = 220 * Math.sin(ang2);
 
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(x, y);
-    ctx.lineTo(x - pinWidth / 2, y);
-    ctx.lineTo(x, y - pinWidth);
-    ctx.closePath();
+    const slice = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    slice.setAttribute("d", `M 0 0 L ${x1} ${y1} A 220 220 0 0 1 ${x2} ${y2} Z`);
+    slice.style.fill = i % 2 === 0 ? sliceColor : stripeColor;
 
-    ctx.fillStyle = i % 2 === 0 ? "#3498db" : "#f39c12";
-    ctx.fill();
+    const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    text.setAttribute("x", `${x1 + (x2 - x1) / 2}`);
+    text.setAttribute("y", `${y1 + (y2 - y1) / 2}`);
+    text.setAttribute("fill", "#fff");
+    text.setAttribute("font-size", "24");
+    text.setAttribute("text-anchor", "middle");
+    text.setAttribute("dominant-baseline", "middle");
+    text.textContent = num.toString();
 
-    ctx.fillStyle = "#fff";
-    ctx.font = "24px Arial";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(num.toString(), x - pinWidth / 2, y - pinWidth / 2);
+    wheel.appendChild(slice);
+    wheel.appendChild(text);
   }
 }
 
 function getWinningNumber() {
-  // Simulate a random winning number selection (replace with your logic)
   return Math.floor(Math.random() * numbers.length);
 }
 
@@ -193,6 +221,5 @@ function hideWinMessage() {
 
 drawWheel(angle);
 </script>
-
 </body>
 </html>
